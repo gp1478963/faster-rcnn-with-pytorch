@@ -32,9 +32,9 @@ faster_rcnn_frame = vision.models.detection.FasterRCNN(
 )
 
 faster_rcnn_frame.eval()
-x = [torch.rand(3, 300, 400), torch.rand(3, 500, 400)]
-
-predictions = faster_rcnn_frame(x)
-print(predictions)
+# x = [torch.rand(3, 300, 400), torch.rand(3, 500, 400)]
+#
+# predictions = faster_rcnn_frame(x)
+# print(predictions)
 
 
