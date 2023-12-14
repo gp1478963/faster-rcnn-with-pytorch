@@ -3,6 +3,7 @@ import predict_image_box
 import torch
 import torchvision
 import os
+import torch_directml
 import torchvision.transforms.v2 as v2
 
 BATCH_SIZE = 1
@@ -33,6 +34,11 @@ def train(model, train_loader, val_loader, optimizer, criterion, lr_scheduler, d
 
 
 if __name__ == '__main__':
+    if torch_directml.is_available():
+        device = torch_directml.device(0)
+    else:
+        device = 'cpu'
+    device = 'cpu'
     voc_dataset_image_transform = v2.Compose([
         datasets_voc.BoxScale(224, 224),
         v2.ToImageTensor(),
@@ -41,9 +47,10 @@ if __name__ == '__main__':
     ])
     voc_trainval_dataset = datasets_voc.VOCDetectionD(root='D:\\image\\datasets\\VOC2007\\VOCtrainval_06-Nov-2007',
                                                       year='2007', image_set='train', download=False,
-                                                      transforms=voc_dataset_image_transform)
+                                                      transforms=voc_dataset_image_transform, device=device)
     voc_train_val_dataset_loader = torch.utils.data.DataLoader(dataset=voc_trainval_dataset, batch_size=BATCH_SIZE,
-                                                               shuffle=True, collate_fn=datasets_voc.VocDatasetCollater())
+                                                               shuffle=True,
+                                                               collate_fn=datasets_voc.VocDatasetCollater(device=device))
 
     model = predict_image_box.generate_faster_rcnn_model(freeze=True)
 
@@ -54,4 +61,4 @@ if __name__ == '__main__':
     for epoch in range(EPOCH):
         train(model=model, train_loader=voc_train_val_dataset_loader,
               val_loader=None, optimizer=sgd_optimizer, criterion=None,
-              lr_scheduler=lr_scheduler, device='cpu', epoch_count=epoch+1, epoch_total=EPOCH)
+              lr_scheduler=lr_scheduler, device=device, epoch_count=epoch+1, epoch_total=EPOCH)

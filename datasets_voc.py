@@ -33,47 +33,47 @@ class BoxScale:
         return (image, boxes, labels) + args[3:]
 
 
-def _boxes_and_labels_adjust(target):
-    boxes_ = []
-    labels_ = []
-
-    for image_target_t in target['annotation']['object']:
-        x1_, y1_, x2_, y2_ = (int(image_target_t['bndbox']['xmin']), int(image_target_t['bndbox']['ymin']),
-                              int(image_target_t['bndbox']['xmax']), int(image_target_t['bndbox']['ymax']))
-        label = classicers.index(image_target_t['name'])
-
-        boxes_.insert(-1, [x1_, y1_, x2_, y2_])
-        labels_.insert(-1, label)
-
-    boxes_ = torch.from_numpy(numpy.array(boxes_)).float()
-    labels_ = torch.from_numpy(numpy.array(labels_, dtype=numpy.int64))
-    return boxes_, labels_
-
-
 class VOCDetectionD(torchvision.datasets.VOCDetection):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, device, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.device = device
 
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
         img = Image.open(self.images[index]).convert("RGB")
         target_ = self.parse_voc_xml(ET.parse(self.annotations[index]).getroot())
-        boxes_, labels_ = _boxes_and_labels_adjust(target_)
+        boxes_, labels_ = self._boxes_and_labels_adjust(target_)
         if self.transforms is not None:
             img, boxes_, labels_ = self.transforms(img, boxes_, labels_)
 
         target_ = {'boxes': boxes_, 'labels': labels_}
         return img, target_
 
+    def _boxes_and_labels_adjust(self, target_):
+        boxes_ = []
+        labels_ = []
+
+        for image_target_t in target_['annotation']['object']:
+            x1_, y1_, x2_, y2_ = (int(image_target_t['bndbox']['xmin']), int(image_target_t['bndbox']['ymin']),
+                                  int(image_target_t['bndbox']['xmax']), int(image_target_t['bndbox']['ymax']))
+            label = classicers.index(image_target_t['name'])
+
+            boxes_.insert(-1, [x1_, y1_, x2_, y2_])
+            labels_.insert(-1, label)
+
+        boxes_ = torch.from_numpy(numpy.array(boxes_)).float().to(self.device)
+        labels_ = torch.from_numpy(numpy.array(labels_, dtype=numpy.int64)).to(self.device)
+        return boxes_, labels_
+
 
 class VocDatasetCollater:
-    def __init__(self): pass
+    def __init__(self, device): self.device = device
 
     def __call__(self, data):
         image_list = []
         target_list = []
         for sampler in data:
-            image_list.insert(-1, sampler[0])
+            image_list.insert(-1, sampler[0].to(self.device))
             target_list.insert(-1, sampler[1])
         return image_list, target_list
 
@@ -91,7 +91,7 @@ if __name__ == '__main__':
                                          year='2007', image_set='train', download=False,
                                          transforms=voc_dataset_image_transform)
     voc_train_val_dataset_loader = torch.utils.data.DataLoader(voc_trainval_dataset, batch_size=2, shuffle=True,
-                                                               collate_fn=VocDatasetCollater())
+                                                               collate_fn=VocDatasetCollater(device='cpu'))
 
     for batch_sampler in voc_train_val_dataset_loader:
         break
